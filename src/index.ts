@@ -169,7 +169,11 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
 
   const files =
     exclusionPatterns.length > 0
-      ? data.filter(({filename}) => {
+      ? data.filter(({filename, status}) => {
+          if (status !== 'added' && status !== 'modified') {
+            return false;
+          }
+
           const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
           if (isExcluded) {
             core.info(`${filename} has been excluded from LFS warning`);
