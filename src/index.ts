@@ -38,9 +38,12 @@ async function run() {
     core.debug(`prFilesWithBlobSize: ${JSON.stringify(prFilesWithBlobSize)}`);
 
     const largeFiles: string[] = [];
+    const statuses: {[key: string]: string} = {};
     const accidentallyCheckedInLsfFiles: string[] = [];
     for (const file of prFilesWithBlobSize) {
-      const {fileblobsize, filename} = file;
+      const {fileblobsize, filename, status} = file;
+      statuses[filename] = status;
+
       if (fileblobsize !== null && fileblobsize > Number(fsl)) {
         largeFiles.push(filename);
       } else {
@@ -69,7 +72,7 @@ async function run() {
 
     if (lsfFiles.length > 0) {
       core.info('Detected file(s) that should be in LFS: ');
-      core.info(lsfFiles.join('\n'));
+      core.info(lsfFiles.map(file => `${file} (${statuses[file]})`).join('\n'));
 
       const body = getCommentBody(
         largeFiles,
@@ -170,7 +173,11 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
   const files =
     exclusionPatterns.length > 0
       ? data.filter(({filename, status}) => {
-          if (status !== 'added' && status !== 'modified') {
+          if (
+            status === 'copied' ||
+            status === 'renamed' ||
+            status === 'removed'
+          ) {
             return false;
           }
 
@@ -184,7 +191,7 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
 
   const prFilesWithBlobSize = await Promise.all(
     files.map(async file => {
-      const {filename, sha, patch} = file;
+      const {filename, sha, patch, status} = file;
       const {data: blob} = await octokit.rest.git.getBlob({
         ...repo,
         file_sha: sha,
@@ -194,6 +201,7 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
         filename,
         filesha: sha,
         fileblobsize: blob.size,
+        status,
         patch,
       };
     })

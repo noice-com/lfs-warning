@@ -12610,9 +12610,11 @@ async function run() {
         const prFilesWithBlobSize = await getPrFilesWithBlobSize(pullRequestNumber);
         core.debug(`prFilesWithBlobSize: ${JSON.stringify(prFilesWithBlobSize)}`);
         const largeFiles = [];
+        const statuses = {};
         const accidentallyCheckedInLsfFiles = [];
         for (const file of prFilesWithBlobSize) {
-            const { fileblobsize, filename } = file;
+            const { fileblobsize, filename, status } = file;
+            statuses[filename] = status;
             if (fileblobsize !== null && fileblobsize > Number(fsl)) {
                 largeFiles.push(filename);
             }
@@ -12634,7 +12636,7 @@ async function run() {
         };
         if (lsfFiles.length > 0) {
             core.info('Detected file(s) that should be in LFS: ');
-            core.info(lsfFiles.join('\n'));
+            core.info(lsfFiles.map(file => `${file} (${statuses[file]})`).join('\n'));
             const body = getCommentBody(largeFiles, accidentallyCheckedInLsfFiles, fsl);
             await Promise.all([
                 octokit.rest.issues.addLabels({
@@ -12719,7 +12721,9 @@ async function getPrFilesWithBlobSize(pullRequestNumber) {
     const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
     const files = exclusionPatterns.length > 0
         ? data.filter(({ filename, status }) => {
-            if (status !== 'added' && status !== 'modified') {
+            if (status === 'copied' ||
+                status === 'renamed' ||
+                status === 'removed') {
                 return false;
             }
             const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
@@ -12730,7 +12734,7 @@ async function getPrFilesWithBlobSize(pullRequestNumber) {
         })
         : data;
     const prFilesWithBlobSize = await Promise.all(files.map(async (file) => {
-        const { filename, sha, patch } = file;
+        const { filename, sha, patch, status } = file;
         const { data: blob } = await octokit.rest.git.getBlob({
             ...repo,
             file_sha: sha,
@@ -12739,6 +12743,7 @@ async function getPrFilesWithBlobSize(pullRequestNumber) {
             filename,
             filesha: sha,
             fileblobsize: blob.size,
+            status,
             patch,
         };
     }));
