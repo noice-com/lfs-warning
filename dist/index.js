@@ -12719,20 +12719,16 @@ async function getPrFilesWithBlobSize(pullRequestNumber) {
         pull_number: pullRequestNumber,
     });
     const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
-    const files = exclusionPatterns.length > 0
-        ? data.filter(({ filename, status }) => {
-            if (status === 'copied' ||
-                status === 'renamed' ||
-                status === 'removed') {
-                return false;
-            }
-            const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
-            if (isExcluded) {
-                core.info(`${filename} has been excluded from LFS warning`);
-            }
-            return !isExcluded;
-        })
-        : data;
+    const files = data.filter(({ filename, status }) => {
+        if (status === 'copied' || status === 'renamed' || status === 'removed') {
+            return false;
+        }
+        const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
+        if (isExcluded) {
+            core.info(`${filename} has been excluded from LFS warning`);
+        }
+        return !isExcluded;
+    });
     const prFilesWithBlobSize = await Promise.all(files.map(async (file) => {
         const { filename, sha, patch, status } = file;
         const { data: blob } = await octokit.rest.git.getBlob({

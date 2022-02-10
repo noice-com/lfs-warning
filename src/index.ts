@@ -170,24 +170,17 @@ async function getPrFilesWithBlobSize(pullRequestNumber: number) {
 
   const exclusionPatterns = core.getMultilineInput('exclusionPatterns');
 
-  const files =
-    exclusionPatterns.length > 0
-      ? data.filter(({filename, status}) => {
-          if (
-            status === 'copied' ||
-            status === 'renamed' ||
-            status === 'removed'
-          ) {
-            return false;
-          }
+  const files = data.filter(({filename, status}) => {
+    if (status === 'copied' || status === 'renamed' || status === 'removed') {
+      return false;
+    }
 
-          const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
-          if (isExcluded) {
-            core.info(`${filename} has been excluded from LFS warning`);
-          }
-          return !isExcluded;
-        })
-      : data;
+    const isExcluded = micromatch.isMatch(filename, exclusionPatterns);
+    if (isExcluded) {
+      core.info(`${filename} has been excluded from LFS warning`);
+    }
+    return !isExcluded;
+  });
 
   const prFilesWithBlobSize = await Promise.all(
     files.map(async file => {
